@@ -44,7 +44,6 @@ async function start() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
     },
-    printQRInTerminal: false,
     browser: ['Linux', 'Chrome', ''],  // [OS, browser, version]
   })
 
@@ -107,6 +106,27 @@ Automatically detects `405 Method Not Allowed` and retries the connection.
 
 ---
 
+## Config Reference (useful options)
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `version` | auto | WA protocol version; pass result of `fetchLatestWaWebVersion()` |
+| `browser` | `['Mac OS', 'Chrome', '14.4.1']` | `[OS, browser, version]` |
+| `auth` | – | `useMultiFileAuthState()` result + `makeCacheableSignalKeyStore()` |
+| `logger` | pino child | any pino logger |
+| `keepAliveIntervalMs` | `30000` | WS keep-alive |
+| `connectTimeoutMs` | `20000` | frame/connect timeout |
+| `defaultQueryTimeoutMs` | `60000` | default `query()` timeout |
+| `markOnlineOnConnect` | `true` | presence; `false` = stay "offline" |
+| `syncFullHistory` | `true` | request full history sync |
+| `getMessage` | – | retry lookup for failed sends |
+| `linkPreviewImageThumbnailWidth` | `192` | link preview thumbnail |
+| `generateHighQualityLinkPreview` | `false` | upload HQ preview image |
+
+Removed in v3.0.0: `printQRInTerminal` (listen to `connection.update` yourself) and `mobile` (mobile API is not supported by WhatsApp servers — throws immediately).
+
+---
+
 ## VoIP / Voice Calling
 
 Built-in WebRTC voice calling using the official WhatsApp WASM stack.  
@@ -139,6 +159,24 @@ client.disconnect()   // cleanup
 node call-test.js                    # default target
 node call-test.js 62812xxxxxxx       # specific number
 CALL_DURATION=60000 node call-test.js  # custom duration (ms)
+```
+
+### Call Links & Reject (socket level)
+
+```javascript
+// create a sharable call link (raw token); prefix it with
+// https://call.whatsapp.com/video/ or https://call.whatsapp.com/voice/
+const token = await sock.createCallLink('video')
+const link = `https://call.whatsapp.com/video/${token}`
+
+// reject an incoming call
+sock.ev.on('call', async (events) => {
+  for (const ev of events) {
+    if (ev.offering && !ev.isGroup) {
+      await sock.rejectCall(ev.callId, ev.callFrom)
+    }
+  }
+})
 ```
 
 ### CallState
@@ -340,8 +378,10 @@ await sock.sendMessage(jid, {
 ```
 
 ### Status Mention
+
 ```javascript
-await sock.sendStatusMention('Hello', jid)
+// content = message content object, jids = array of contact/group jid
+await sock.sendStatusMention({ text: 'Hello' }, ['628xxxx@s.whatsapp.net'])
 ```
 
 ---
@@ -389,8 +429,52 @@ await sock.setLabelGroup(jid, 'label')
 ## Newsletter
 
 ```javascript
-const info = await sock.newsletterFromUrl('https://whatsapp.com/channel/...')
-console.log(info) // { name, id, state, subscribers, verification, creation_time, description }
+// Fetch by jid
+const info = await sock.newsletterMetadata('jid', jidNewsletter)
+// ...or by invite code (channel URL's last path segment)
+const info2 = await sock.newsletterMetadata('invite', inviteCode)
+
+// Follow / unfollow / react
+await sock.newsletterFollow(jid)
+await sock.newsletterUnfollow(jid)
+await sock.newsletterReactMessage(jid, messageId, message, emoji)
+
+// Admin ops
+await sock.newsletterUpdateName(jid, 'New Name')
+await sock.newsletterUpdateDescription(jid, 'New Description')
+await sock.newsletterMute(jid)
+await sock.newsletterCreate('Channel Name', 'Description')
+```
+
+---
+
+## Communities
+
+```javascript
+const community = await sock.communityCreate('Community Name', 'Description')
+await sock.communityMetadata(jid)
+await sock.communityLinkGroup(communityJid, groupJid)
+await sock.communityAcceptInvite('https://chat.whatsapp.com/...')
+await sock.communitySettingUpdate(communityJid, 'announcement') // 'announcement' | 'unlocked'
+await sock.communityToggleEphemeral(communityJid, 86400)         // disappearing messages
+```
+
+---
+
+## Store (fork add-on)
+
+```javascript
+const { makeInMemoryStore } = require('@ms-nicky/baileys')
+
+const store = makeInMemoryStore({})
+store.readFromFile('./baileys-store.json')
+
+// bind store to events so chats/contacts/labels keep syncing
+sock.ev.on('messages.upsert', () => store.writeToFile('./baileys-store.json'))
+sock.ev.bind(store.ev)
+
+// optional: cache-manager backed auth state
+const { makeCacheManagerAuthState } = require('@ms-nicky/baileys')
 ```
 
 ---
@@ -398,8 +482,9 @@ console.log(info) // { name, id, state, subscribers, verification, creation_time
 ## Utility Functions
 
 ```javascript
-// Check if number is on WhatsApp
-const result = await sock.checkWhatsApp(jid)
+// Check if number(s) is on WhatsApp
+const checks = await sock.onWhatsApp('628xxxx', '628xxxx')
+// [{ phoneNumber: '628xxxx', jid: ..., exists: true }, ...]
 
 // Block/unblock
 await sock.updateBlockStatus(jid, 'block')
