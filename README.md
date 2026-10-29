@@ -1,10 +1,14 @@
 # @ms-nicky/baileys
 
 WhatsApp API library using WebSocket technology (multi-device).  
-Fork of [WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys) with:
+Fork of [WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys) (base `7.0.0-rc14`) with:
 - Pairing code fixes (canonical browser label, server response wait, 515 auto-reconnect)
-- Auto version detection from WPPConnect
+- Auto version detection (WA Web sw.js + WPPConnect fallback)
 - Built-in VoIP calling (WebRTC / baileys-caller)
+- Latest WhatsApp protobuf (202 message types)
+- CommonJS build (`require()` works) + ESM named imports
+
+> Requires Node.js >= 20.19.0 (needed to `require()` ESM-only dependencies).
 
 ---
 
@@ -77,7 +81,7 @@ Auto-reconnects after pairing is accepted (handles 515 stream error).
 
 ### Auto Version Detection
 
-Fetches latest WA version from [WPPConnect](https://wppconnect.io/whatsapp-versions), falls back to hardcoded.
+Fetches the WA Web version automatically (from `web.whatsapp.com/sw.js`, falling back to [WPPConnect](https://wppconnect.io/whatsapp-versions)), falls back to hardcoded.
 
 ```javascript
 const { version, isLatest } = await fetchLatestWaWebVersion()
@@ -455,6 +459,17 @@ sock.ev.on('creds.update', saveCreds)
 - Telegram: [t.me/MsXploiter](https://t.me/MsXploiter)
 
 ---
+
+## Changelog v3.0.0
+
+- Rebased onto upstream `@whiskeysockets/baileys` `7.0.0-rc14` (latest line), compiled to CommonJS
+- Regenerated `WAProto` from the latest upstream protocol (202 message types, +~1 year of new WhatsApp messages)
+- WA handshake version `2.3000.1043857760` (same as latest upstream)
+- Removed legacy mobile-registration layer and random-failure "guard" code
+- `libsignal` upgraded to official v6, `pino` v9, `protobufjs` v7.5
+- Pairing code flow: `query()` (waits for server response), phone sanitization, canonical platform labels, raw nonce
+- `require()` CommonJS + ESM named-import support
+- Node engine: >= 20.19.0
 
 ## License
 
