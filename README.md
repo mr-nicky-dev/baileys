@@ -85,6 +85,14 @@ Pastikan fungsi pembuat gambar menu mengembalikan `Buffer` atau sumber yang sesu
 
 `7.0.0-rc14` adalah release candidate. Lihat [panduan migrasi resmi v7](https://github.com/WhiskeySockets/docs/blob/main/migration/v7.mdx) untuk perubahan breaking, termasuk ESM-only dan perubahan API.
 
+### Perbaikan upload pada fork ini
+
+Fork ini mencoba semua host dan kredensial dari koneksi media yang sedang berlaku. Jika semua host gagal, fork meminta media connection baru lalu mencoba satu putaran lagi menggunakan host **dan** kredensial dari hasil refresh tersebut. Error upload tetap perlu didiagnosis berdasarkan log jaringan; perubahan ini tidak mengasumsikan bahwa endpoint WhatsApp telah berubah.
+
+File sementara pada upload newsletter, gambar katalog, dan foto profil bisnis dibersihkan walaupun upload gagal. Upload media biasa juga membersihkan file enkripsi dan file sumber pada jalur sukses maupun gagal. Helper milik bot seperti `getMenuThemeImage()` dan `writeExifImg()` tidak berada di repo library ini; pastikan bot menghapus file yang dibuat helper tersebut.
+
+Jika upload masih gagal, log yang membantu adalah hostname yang dicoba, status/hasil HTTP, serta pesan error. Samarkan token autentikasi dan jangan bagikan kredensial sesi.
+
 ### Rollback
 
 Jika migrasi masih di branch terpisah, kembali ke branch kerja sebelum migrasi:
