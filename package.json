@@ -15,7 +15,7 @@
         "baseurl": "https://nickystore.my.id"
     },
     "license": "MIT",
-    "author": "ms-nicky",
+    "author": "mr-nicky-dev",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "files": [
