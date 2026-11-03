@@ -1,5 +1,109 @@
 # @ms-nicky/baileys
 
+## Panduan migrasi bot ke Baileys 7.0.0-rc14
+
+> **Status repo ini:** kode fork `@ms-nicky/baileys` sudah direbase ke upstream Baileys `7.0.0-rc14`. Versi `3.0.0` di `package.json` adalah versi fork ini, bukan versi upstream. Repo ini berisi library, bukan source code bot Elaina-Asisten. Panduan ini menjelaskan pemasangan Baileys resmi di repo bot; perubahan dependency dan kode bot harus dilakukan di repo bot tersebut.
+
+Baileys 7 bersifat ESM dan memerlukan Node.js 20 atau lebih baru. Kalau bot masih memakai `require()`, ubah project menjadi ESM sebelum mengganti library.
+
+### 1. Simpan kondisi lama untuk rollback
+
+Di repo bot, buat branch sebelum migrasi:
+
+```bash
+git status
+git switch -c chore/migrate-baileys-7
+```
+
+Pastikan perubahan kerja yang sudah ada disimpan sebelum berpindah branch. Buat commit migrasi setelah dependency dan kode berhasil diperbarui.
+
+### 2. Pasang versi yang diminta
+
+Pilih satu perintah sesuai package manager project:
+
+```bash
+npm install @whiskeysockets/baileys@7.0.0-rc14
+# atau: yarn add @whiskeysockets/baileys@7.0.0-rc14
+# atau: pnpm add @whiskeysockets/baileys@7.0.0-rc14
+```
+
+Hapus dependency fork lama dari `package.json` jika sebelumnya memakai `@ms-nicky/baileys`. Jangan mencampur import dari dua package.
+
+### 3. Aktifkan ESM dan ubah import
+
+Tambahkan `"type": "module"` ke `package.json` bot. Ubah `require()` menjadi `import`, termasuk pada contoh koneksi:
+
+```js
+import makeWASocket, {
+  fetchLatestBaileysVersion,
+  useMultiFileAuthState,
+} from '@whiskeysockets/baileys'
+import pino from 'pino'
+
+const { state, saveCreds } = await useMultiFileAuthState('./auth_info')
+const { version } = await fetchLatestBaileysVersion()
+
+const sock = makeWASocket({
+  version,
+  auth: state,
+  logger: pino({ level: 'silent' }),
+})
+
+sock.ev.on('creds.update', saveCreds)
+sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
+  if (connection === 'open') console.log('WhatsApp terhubung')
+  if (connection === 'close') console.error('Koneksi terputus:', lastDisconnect?.error)
+})
+```
+
+`fetchLatestBaileysVersion()` adalah API upstream. Fork repo ini memiliki helper bernama `fetchLatestWaWebVersion()`. Periksa API lain yang dipakai bot; helper khusus fork mungkin tidak tersedia di package resmi.
+
+### 4. Kirim media
+
+Gunakan URL HTTP(S), path file lokal, atau `Buffer` sebagai sumber media:
+
+```js
+import { readFile } from 'node:fs/promises'
+
+await sock.sendMessage(jid, {
+  image: { url: 'https://example.com/foto.jpg' },
+  caption: 'Contoh gambar',
+})
+
+await sock.sendMessage(jid, { sticker: await readFile('./sticker.webp') })
+```
+
+Pastikan fungsi pembuat gambar menu mengembalikan `Buffer` atau sumber yang sesuai dengan pemanggilnya. Jika helper EXIF mengembalikan path file, baca file menjadi `Buffer` bila alur bot memerlukannya. Hapus file sementara setelah pemakaian dengan `try/finally`, termasuk ketika upload gagal.
+
+### 5. Checklist setelah migrasi
+
+1. Jalankan bot dan selesaikan pairing pada akun uji.
+2. Coba kirim pesan teks, gambar, video, audio, dan sticker satu per satu.
+3. Catat error upload, kode status, dan hostname yang gagal. Jangan catat kredensial atau token autentikasi.
+4. Pastikan file sementara dibersihkan ketika upload berhasil maupun gagal.
+5. Periksa import dan fitur fork khusus seperti VoIP, pairing code, serta helper versi WA sebelum deploy.
+
+`7.0.0-rc14` adalah release candidate. Lihat [panduan migrasi resmi v7](https://github.com/WhiskeySockets/docs/blob/main/migration/v7.mdx) untuk perubahan breaking, termasuk ESM-only dan perubahan API.
+
+### Rollback
+
+Jika migrasi masih di branch terpisah, kembali ke branch kerja sebelum migrasi:
+
+```bash
+git switch main
+```
+
+Jika sudah digabung, pulihkan dependency dan lockfile dari commit sebelum migrasi, lalu install ulang dengan package manager yang sama. Contoh untuk npm:
+
+```bash
+git restore --source=<commit-sebelum-migrasi> -- package.json package-lock.json
+npm install
+```
+
+Jangan hapus folder autentikasi saat rollback; sesi WhatsApp tersimpan di sana. Karena source code bot tidak ada di repo ini, migrasi implementasi dan verifikasi upload perlu dilakukan di repo bot.
+
+---
+
 WhatsApp API library using WebSocket technology (multi-device).  
 Fork of [WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys) (base `7.0.0-rc14`) with:
 - Pairing code fixes (canonical browser label, server response wait, 515 auto-reconnect)
